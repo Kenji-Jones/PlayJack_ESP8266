@@ -528,7 +528,7 @@ void WiFiManager::handleWifi(boolean scan) {
   page += "<br/>";
   //---------------------------------------------------------------------
   char parLength[2];
-  page += F("<h4>Leading LED Color (0x??????) hex color</h4>");
+  page += F("<h4>LedSpeed /update interval (2~50)</h4>");
   String pitem = FPSTR(HTTP_FORM_PARAM);
   if (_params[0]->getID() != NULL) {
     pitem.replace("{i}", _params[0]->getID());
@@ -545,7 +545,7 @@ void WiFiManager::handleWifi(boolean scan) {
   page += pitem;
   page += "<br/>";
 //---------------------------------------------------------------------
-  page += F("<h4>P1 Color / P2 Color / P3 Color (0x??????)</h4>");
+  page += F("<h4>P1 Color / fadeAmount (0~100) / P2 Color (0x??????)</h4>");
 
   // char parLength[2];
   // add the extra parameters to the form
