@@ -9,8 +9,10 @@ This is a proof of concept using:
 - Wifi captive portal for adjustments https://github.com/nhaduy99/Walkgreen_v2.0 (using this for reference)
 
 To do
-- add a logic level shifter to change 3v3 to 5v for the LED signal pin. (flickering issue)
 - Captive portal adjustments (i want to add a color picker if possible?)
+- Make it possible to update without internet connection (just between phone and esp8266)
+- autocalibrate A0 sensor so it doesnt trigger when nothing is happening
+- separate timers for led fade and led runs
 
 
 
