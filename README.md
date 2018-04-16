@@ -1,5 +1,11 @@
 # PlayJack_ESP8266
 
+Capabilities:
+- color and speed of LEDs can be changed from the wifi portal
+- tested 135m two way communication using pcb trace antennas
+- 70m of communication was reached in Shibuya, Tokyo on a friday night.
+
+
 This is a proof of concept using:
 - Wemos D1 Mini ESP8266 https://escapequotes.net/esp8266-wemos-d1-mini-pins-and-diagram/
 - NRF24L01+ https://arduino-info.wikispaces.com/Nrf24L01-2.4GHz-HowTo
