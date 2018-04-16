@@ -4,6 +4,7 @@ Capabilities:
 - color and speed of LEDs can be changed from the wifi portal
 - tested 135m two way communication using pcb trace antennas
 - 70m of communication was reached in Shibuya, Tokyo on a friday night.
+- 40m of reliable two way communication in Shibuya
 
 
 This is a proof of concept using:
@@ -39,4 +40,3 @@ NRF24L01+ http://foreglance.com/wp-content/uploads/2014/08/NRF24L01plus-pinout.p
 - D8 / 15 = CSN   (on NRF24)
 - 3v3     = VCC   (on NRF24)
 - 5V      = WS2812B power (for short strips)
-
