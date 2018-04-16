@@ -13,6 +13,7 @@ To do
 - Make it possible to update without internet connection (just between phone and esp8266)
 - autocalibrate A0 sensor so it doesnt trigger when nothing is happening
 - separate timers for led fade and led runs
+- add LED count to adjustable settings
 
 
 
