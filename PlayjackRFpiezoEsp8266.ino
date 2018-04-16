@@ -10,29 +10,34 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 #include "RF24.h"  // Download and Install (See above)
+#define FASTLED_ALLOW_INTERRUPTS 0 /// testing to stop flickering
 #include <FastLED.h>
-#define NUM_LEDS 30
+
+#define TRIGGER A0  // for piezo sensor
+#define THRESHOLD 80 // hardware adjustment would be best?
+byte val = 0; // trigger stuff
+
+#define NUM_LEDS 15 //15 per mini testm 113 /31 144/m 300/5m 
 #define DATA_PIN 5
-CRGB leds[NUM_LEDS];
+//CRGB leds[NUM_LEDS];
+CRGBArray<NUM_LEDS> leds;
 
 //Add more library for using the ADS1115 - the expanding for 4 ADC pin by connecting SCL -> D1 ; SDA ->D2; ADDR-->GND;
 #include <Wire.h>
-//#include <Adafruit_ADS1015.h>
-
-//Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
   
 //ESP8266WebServer server(80);
 //define your default values here, if there are different values in config.json, they are overwritten.
 
-RF24 myRadio (2, 15); // was (7, 8)"myRadio" is the identifier you will use in following methods
+RF24 myRadio (4, 15); // was (7, 8)"myRadio" is the identifier you will use in following methods
 /*-----( Declare Variables )-----*/
 byte addresses[][6] = {"1Node"}; // Create address for 1 pipe.
 int dataReceived;  // Data that will be received from the transmitter
+int dataTransmitted;  
 int dot1 = NUM_LEDS+1; // led pixel number / tracker
 int dot2 = NUM_LEDS+1; // led pixel number / tracker
 int brightness = 0;    // how bright the LED is ( WAS 0 / then 21 )
-int fadeAmount = 0 ;// = -10;    // how many points to fade the LED by (in main loop)
-int ledDelay = 1; // variable to smooth fading
+int fadeAmount = 10 ;// = -10;    // how many points to fade the LED by (in main loop)
+int ledSpeed = 25; // time between LED write cycles (was 15)
 int bigHit = 1; // variable to indicate that 255 has been hit (use for if statement filters)
 int ledFlickerDelay = 200; // flicker timing for bighit
 int ledFlicker = 0; // flicker on/off
@@ -46,11 +51,6 @@ unsigned long p2color;
 unsigned long p3color; // p3color is not in use... was thinking of using it to wipe
 
 #define TRIGGER_PIN   16           // a button for reseting Wifi SSID - PASS WEMOS: D7 = GPIO13
-//#define RED_LED       12           // Connect LED with D6 pin and resistor 100 Ohm   ************************************
-//#define GREEN_LED     14           // Connect LED with D5 pin and resistor 100 Ohm     ************************************
-//#define SCL           5            // Connect ADC with D1 pin      ************************************
-//#define SDA           4            // Connect ADC with D2 pin      ************************************
-//#define POWER_OF_SENSOR  15            // Pin D8 using for powering the sensor
 
 const char* host_read;
 const char* port_read;
@@ -90,19 +90,31 @@ void setup() {   /****** SETUP: RUNS ONCE ******/
   delay(500);
   Serial.begin(115200);
   Serial.println();
-  Serial.println(F("PlayjackWifiRFtestesp8266"));
+  Serial.println(F("Arduino File: playjack_esp8266feedback"));
   Serial.print(F("Number of assigned LEDS:"));
   Serial.println(NUM_LEDS);
-  Serial.print(F("** Assigned LEDS may not match the amount of LEDS connected to device"));
-  myRadio.begin();  // Start up the physical nRF24L01 Radio
+  Serial.print(F("ledSpeed = "));
+  Serial.println(ledSpeed);
+  Serial.println(F("** Assigned LEDS may not match the amount of LEDS connected to device"));
+  Serial.print(F("Trigger Threshold = "));
+  Serial.println(THRESHOLD);
+
+  // NRF24l01+ radio section
+  myRadio.begin();
+  myRadio.setAutoAck(1);                    // Ensure autoACK is enabled
+  myRadio.enableAckPayload();               // Allow optional ack payloads
+  myRadio.setRetries(6,15);                 // x*250us and amount of tries first is microsecond interval, second is amount of tries. 
+                                            // Smallest time between retries, max no. of retries
   myRadio.setChannel(108);  // Above most Wifi Channels
+  myRadio.setDataRate(RF24_250KBPS); // maximum range
   // Set the PA Level low to prevent power supply related issues since this is a
   // getting_started sketch, and the likelihood of close proximity of the devices. RF24_PA_MAX is default.
-  // myRadio.setPALevel(RF24_PA_MIN); // was min power at first
+  // myRadio.setPALevel(RF24_PA_LOW); // was min power at first
   myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
-
+  myRadio.openWritingPipe( addresses[0]); // was [1]
   myRadio.openReadingPipe(1, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
   myRadio.startListening();
+  //myRadio.printDetails(); // uncomment for radio debugging (lot of info)
   FastLED.clear();
   FastLED.show(); // wipe LEDs when turned on /restarted
 
@@ -123,42 +135,13 @@ void setup() {   /****** SETUP: RUNS ONCE ******/
   //pinMode(POWER_OF_SENSOR, OUTPUT);
   //digitalWrite(POWER_OF_SENSOR, HIGH);
   
-//-----------------Read ADC values from Battery--------------------------------------
-  // The ADC input range (or gain) can be changed via the following
-  // functions, but be careful never to exceed VDD +0.3V max, or to
-  // exceed the upper and lower limits if you adjust the input range!
-  // Setting these values incorrectly may destroy your ADC!
-  //                                                                ADS1015  ADS1115
-  //                                                                -------  -------
-  // ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
-  // ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
-  // ads.setGain(GAIN_TWO);        // 2x gain   +/- 2.048V  1 bit = 1mV      0.0625mV
-  // ads.setGain(GAIN_FOUR);       // 4x gain   +/- 1.024V  1 bit = 0.5mV    0.03125mV
-  // ads.setGain(GAIN_EIGHT);      // 8x gain   +/- 0.512V  1 bit = 0.25mV   0.015625mV
-  // ads.setGain(GAIN_SIXTEEN);    // 16x gain  +/- 0.256V  1 bit = 0.125mV  0.0078125mV
-      //ads.begin();
-  
-  // Read all 4 channels of ADC
-//  adc0 = ads.readADC_SingleEnded(0);
-// adc1 = ads.readADC_SingleEnded(1);
-//  adc2 = ads.readADC_SingleEnded(2);
-//  adc3 = ads.readADC_SingleEnded(3);
   
   Serial.print("AIN0: "); Serial.println(A0);
 //  Serial.print("AIN1: "); Serial.println(adc1);
 //  Serial.print("AIN2: "); Serial.println(adc2);
 //  Serial.print("AIN3: "); Serial.println(adc3);
   
-// //----Turn on the energy for Transistors: supply voltage to the Moisture sensor, connection with the chargers
-//  if (adc3 <10000)
-//  {
-//      digitalWrite(BJT, HIGH);  // set HIGH to switch ON
-//  }
-//  else
-//  {
-//      digitalWrite(BJT, LOW);  // set HIGH to switch OFF
-//  }
-//   
+  
    //------------------Reset when pushing the button at first-------------------------
        while(digitalRead(TRIGGER_PIN) ==0)
         {
@@ -235,8 +218,8 @@ void setup() {   /****** SETUP: RUNS ONCE ******/
 */
       WiFiManagerParameter  custom_token("0x000000","0x000000",token, 80);
       WiFiManagerParameter  custom_host("0x0d7287","0x0d7287",host, 120);
-      WiFiManagerParameter  custom_port("0x700d87","0x700d87",port, 8);
-      WiFiManagerParameter  custom_sleep("0xffffff","0xffffff",sleep, 10);
+      WiFiManagerParameter  custom_port("20","20",port, 8);
+      WiFiManagerParameter  custom_sleep("15","15",sleep, 10);
 
   //--------------------------WiFiManager---------------------------
     WiFiManager wifiManager;
@@ -264,7 +247,7 @@ void setup() {   /****** SETUP: RUNS ONCE ******/
   //if it does not connect it starts an access point with the specified name
   //here  "AutoConnectAP"
   //and goes into a blocking loop awaiting configuration
-  if (!wifiManager.autoConnect("Walkgreen_v2.0")) {
+  if (!wifiManager.autoConnect("PlayJack_V2.0proto")) {  //Walkgreen_v2.0
     Serial.println("failed to connect and hit timeout");
     delay(5000);
     //reset and try again, or maybe put it to deep sleep
@@ -324,15 +307,15 @@ void setup() {   /****** SETUP: RUNS ONCE ******/
   Serial.println(port_read);
   Serial.print(F("token_read:"));
   Serial.println(token_read);
-  leadingDot = strtol(sleep_read, NULL, 16);
+  ledSpeed = strtol(sleep_read, NULL, 16);
   p1color = strtol(host_read, NULL, 16);
-  p2color = strtol(port_read, NULL, 16);
-  p3color = strtol(token_read, NULL, 16);
-  Serial.print(F("Leading Dot hex color:"));
+  fadeAmount = strtol(port_read, NULL, 16);
+  p2color = strtol(token_read, NULL, 16);
+  Serial.print(F("LedSpeed:"));
   Serial.println(sleep_read);
   Serial.print(F("p1color hex color:"));
   Serial.println(host_read);
-  Serial.print(F("p2color hex color:"));
+  Serial.print(F("fadeAmount:"));
   Serial.println(port_read);
   Serial.print(F("p3color hex color:"));
   Serial.println(token_read);
@@ -356,6 +339,21 @@ void loop() {     /****** LOOP: RUNS CONSTANTLY ******/
 
      // check to see if it's time to change the state of the LED
   unsigned long currentMillis = millis(); // use this instead of delay
+   val = analogRead(TRIGGER);
+   if(val > THRESHOLD) {
+     Serial.print(F("Trigger ADC = "));
+     Serial.println(val);
+    //// experiment
+     dataTransmitted = 777; // dot1
+     myRadio.stopListening();
+     Serial.println(F("radio stop listening"));
+     myRadio.write( &dataTransmitted, sizeof(dataTransmitted) );
+     Serial.print(F("Signal Sent = "));
+     Serial.println(dataTransmitted); // was dataTransmitted
+     myRadio.startListening();
+     leds = p2color; // trigger color?
+     //// end experiment
+   }
 
   if ( myRadio.available()) // Check for incoming data from transmitter
   {
@@ -364,7 +362,7 @@ void loop() {     /****** LOOP: RUNS CONSTANTLY ******/
       myRadio.read( &dataReceived, sizeof(dataReceived) ); // Get the data payload (You must have defined that already!)
     } */
     // DO something with the data, like print it
-     myRadio.read( &dataReceived, sizeof(dataReceived) ); //This works? Why was the while loop there?
+     myRadio.read( &dataReceived, sizeof(dataReceived) ); 
     Serial.print("Data received = ");
     Serial.println(dataReceived);
     lastReceivedMillis = currentMillis;
@@ -379,13 +377,15 @@ void loop() {     /****** LOOP: RUNS CONSTANTLY ******/
       dot1 = 0; //off
       Serial.println(" Dot1 Hit");
     }
-    if (dataReceived == 666){
+    else if (dataReceived == 666){
       dot2 = 0;
       Serial.println(" Dot2 Hit");
    }
 
    else {
     Serial.println(" INVALID MESSAGE INVALID MESSAGE INVALID MESSAGE INVALID MESSAGE INVALID MESSAGE ");
+    Serial.print("Invalid Data received = ");
+    Serial.println(dataReceived);
     dataReceived = 0;
    }
     
@@ -411,18 +411,23 @@ void loop() {     /****** LOOP: RUNS CONSTANTLY ******/
 //<<<<<<<<<<<<<<<<<<<<<<<<< WS2182 CONTROL SECTION >>>>>>>>>>>>>>>>>>>>>>>>>>>>
 //<<<<<<<<<<<<<<<<<<<<<<<<< WS2182 CONTROL SECTION >>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
- if (dot1 < NUM_LEDS || dot2 < NUM_LEDS) //need one delay time for everything
+ if((currentMillis - previousMillis >= ledSpeed))
+      {
+      previousMillis = currentMillis; // creating a checkpoint since the last change
+
+
+ /*if (dot1 < NUM_LEDS || dot2 < NUM_LEDS) //need one delay time for everything
      {
       delay(15);
      }
-
- if (dot1 < NUM_LEDS)  //START
+*/
+ if (dot1 <= NUM_LEDS)  //START
       { 
        //for(int dot = 0; dot < NUM_LEDS; dot++) { 
             //leds[dot] = CRGB::Blue;
-            //leds[dot1].setRGB( 255, 255, 255); //RGB method
-            leds[dot1] = leadingDot;
-            FastLED.show();
+            leds[dot1+1].setRGB( 255, 255, 255); //RGB method
+            //leds[dot1] = leadingDot;
+         //FastLED.show();
             // clear this led for the next time around the loop
             // leds[dot1] = CRGB::Black; // black means off
             //delay(15);
@@ -433,48 +438,77 @@ void loop() {     /****** LOOP: RUNS CONSTANTLY ******/
             Serial.println(dot1);
         }
      
-if (dot1 == NUM_LEDS) // # of cycles for first note　// I think this is the problem...
+if (dot1 == NUM_LEDS) // 
     {
      //FastLED.clear();
      leds[dot1] = CRGB::Black; 
-     FastLED.show();
+     //FastLED.show();
      Serial.print(F("dot1 terminated at "));
      dot1 = (NUM_LEDS+1);
      Serial.println(dot1);
+     ///*
+     //// experiment
+     dataTransmitted = 666; // dot1
+     myRadio.stopListening();
+     Serial.println(F("radio stop listening"));
+     myRadio.write( &dataTransmitted, sizeof(dataTransmitted) );
+     Serial.print(F("Signal Sent = "));
+     Serial.println(dataTransmitted); // was dataTransmitted
+     myRadio.startListening();
+     //// end experiment
+     //*/
    }
         //// END dot1
 
 
 
-if (dot2 < NUM_LEDS)  //START
+if (dot2 <= NUM_LEDS)  //START
       { 
        //for(int dot = 0; dot < NUM_LEDS; dot++) { 
             //leds[dot] = CRGB::Blue;
-            //leds[(NUM_LEDS-(dot2+1))].setRGB(255, 255, 255); //RGB method
-            leds[(NUM_LEDS-(dot2+1))] = leadingDot;
-            FastLED.show();
-            //Serial.println(" in big hit? ");
+            leds[(NUM_LEDS-(dot2+1))].setRGB(255, 255, 255); //RGB method
+            //leds[(NUM_LEDS-(dot2+1))] = leadingDot;
+            //FastLED.show();
             // clear this led for the next time around the loop
             //leds[dot2] = CRGB::Black; // black means off
           //leds[(NUM_LEDS-(dot2+1))].setRGB( atoi(host_read), atoi(port_read), atoi(token_read)); //RGB method
             //leds[(NUM_LEDS-(dot2+1))] = strtol(sleep_read, NULL, 16);
-            leds[(NUM_LEDS-(dot2+1))] = p2color;
+            leds[(NUM_LEDS-(dot2))] = p2color;
             //delay(15);
             dot2 = dot2+1;
             Serial.print(F("dot2 = "));
             Serial.println(dot2);
         }
+
+
+
      
 if (dot2 == NUM_LEDS) // # of cycles for first note　// I think this is the problem...
     {
      //FastLED.clear();
-     leds[dot2] = CRGB::Black; 
-     FastLED.show();
+     leds[0] = p2color; 
+     //FastLED.show();
      Serial.print(F("dot2 terminated at "));
      dot2 = (NUM_LEDS+1);
      Serial.println(dot2);
+     //// experiment
+     dataTransmitted = 777; // dot1
+     myRadio.stopListening();
+     Serial.println(F("radio stop listening"));
+     myRadio.write( &dataTransmitted, sizeof(dataTransmitted) );
+     Serial.print(F("Signal Sent = "));
+     Serial.println(dataTransmitted); // was dataTransmitted
+     myRadio.startListening();
+     //// end experiment
+     
    }
+
+
+      leds.fadeToBlackBy(fadeAmount);// make this a single variable for all patterns
+       //delay(15);
+       FastLED.show();
         //// END dot2
+    } // end ledSpeed governed section
    
 
 
@@ -751,4 +785,3 @@ void deep_sleep(){
   delay(500);
   
 }
-
