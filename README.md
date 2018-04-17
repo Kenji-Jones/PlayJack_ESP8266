@@ -31,7 +31,7 @@ NRF24L01+ http://foreglance.com/wp-content/uploads/2014/08/NRF24L01plus-pinout.p
 
 (Wemos Printed Pin / Arduino Pin)
 - A0 / A0 = Piezo Positive to ADC (optional)
-- D0 / 16 = Button to ground for wifi portal
+- D3 / 0 = Button to ground for wifi portal // changed from D0 / 16
 - D1 / 5  = Signal for WS2812B leds
 - D2 / 4  = CE    (on NRF24)
 - D5 / 14 = SCK   (on NRF24)
