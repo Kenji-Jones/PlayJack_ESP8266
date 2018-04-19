@@ -40,3 +40,9 @@ NRF24L01+ http://foreglance.com/wp-content/uploads/2014/08/NRF24L01plus-pinout.p
 - D8 / 15 = CSN   (on NRF24)
 - 3v3     = VCC   (on NRF24)
 - 5V      = WS2812B power (for short strips)
+
+
+EDITS
+in WifiManager.h
+_shouldBreakAfterConfig =  = true; // was false
+      this allows the device to update without connecting to internet.
