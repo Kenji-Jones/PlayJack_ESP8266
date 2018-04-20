@@ -94,7 +94,7 @@ void WiFiManager::addParameter(WiFiManagerParameter *p) {
   DEBUG_WM(p->getID());
 }
 
-void WiFiManager::setupConfigPortal() {
+void WiFiManager::setupConfigPortal() { 
   dnsServer.reset(new DNSServer());
   server.reset(new ESP8266WebServer(80));
 
@@ -102,8 +102,8 @@ void WiFiManager::setupConfigPortal() {
   _configPortalStart = millis();
 
   DEBUG_WM(F("Configuring access point... "));
-  DEBUG_WM(_apName);
-  if (_apPassword != NULL) {
+  DEBUG_WM(_apName); // prints PlayJack21357
+  if (_apPassword != NULL) { //onliy if theres a password requirement
     if (strlen(_apPassword) < 8 || strlen(_apPassword) > 63) {
       // fail passphrase to short or long!
       DEBUG_WM(F("Invalid AccessPoint password. Ignoring"));
@@ -113,7 +113,7 @@ void WiFiManager::setupConfigPortal() {
   }
 
   //optional soft ip config
-  if (_ap_static_ip) {
+  if (_ap_static_ip) { 
     DEBUG_WM(F("Custom AP IP/GW/Subnet"));
     WiFi.softAPConfig(_ap_static_ip, _ap_static_gw, _ap_static_sn);
   }
@@ -134,9 +134,9 @@ void WiFiManager::setupConfigPortal() {
 
   /* Setup web pages: root, wifi config pages, SO captive portal detectors and not found. */
   server->on("/", std::bind(&WiFiManager::handleRoot, this));
-  server->on("/wifi", std::bind(&WiFiManager::handleWifi, this, true));
-  server->on("/0wifi", std::bind(&WiFiManager::handleWifi, this, false));
-  server->on("/wifisave", std::bind(&WiFiManager::handleWifiSave, this));
+  server->on("/controller", std::bind(&WiFiManager::handleWifi, this, true));
+  server->on("/0controller", std::bind(&WiFiManager::handleWifi, this, false));
+  server->on("/devicesave", std::bind(&WiFiManager::handleWifiSave, this));
   server->on("/i", std::bind(&WiFiManager::handleInfo, this));
    server->on("/r", std::bind(&WiFiManager::handleReset, this));
   // server->on("/generate_204", std::bind(&WiFiManager::handle204, this));  //Android/Chrome OS captive portal check.
@@ -144,18 +144,19 @@ void WiFiManager::setupConfigPortal() {
   server->onNotFound (std::bind(&WiFiManager::handleNotFound, this));
   server->on("/submit", std::bind(&WiFiManager::handleSubmit, this));
   server->begin(); // Web server start
-  DEBUG_WM(F("HTTP server started"));
+  DEBUG_WM(F("HTTP server started"));  // when portal button is pressed
 
 }
 
 boolean WiFiManager::autoConnect() {
-  String ssid = "ESP" + String(ESP.getChipId());
+  //String ssid = "ESP" + String(ESP.getChipId());
+  String ssid = "PlayJack" + String(ESP.getChipId());
   return autoConnect(ssid.c_str(), NULL);
 }
 
 boolean WiFiManager::autoConnect(char const *apName, char const *apPassword) {
   DEBUG_WM(F(""));
-  DEBUG_WM(F("AutoConnect"));
+  DEBUG_WM(F("AutoConnect")); // serial print
 
   // read eeprom for ssid and pass
   //String ssid = getSSID();
@@ -180,16 +181,17 @@ boolean WiFiManager::configPortalHasTimeout(){
       return false;
     }
     return (millis() > _configPortalStart + _configPortalTimeout);
+    DEBUG_WM("configPortalHasTimeout() returning true?");
 }
 
-boolean WiFiManager::startConfigPortal() {
-  String ssid = "ESP" + String(ESP.getChipId());
+boolean WiFiManager::startConfigPortal() { // fills in variables if left blank
+  String ssid = "PlayJack" + String(ESP.getChipId()); // "ESP"
   return startConfigPortal(ssid.c_str(), NULL);
 }
 
 boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPassword) {
   //setup AP
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP); // sets access point
   DEBUG_WM("SET AP");
 
   _apName = apName;
@@ -201,7 +203,7 @@ boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPasswo
   }
 
   connect = false;
-  setupConfigPortal();
+  setupConfigPortal(); //
 
   while(1){
 
@@ -213,7 +215,7 @@ boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPasswo
     //HTTP
     server->handleClient();
 
-
+     // connecting to new ap
     if (connect) {
       connect = false;
       delay(100);
@@ -221,14 +223,13 @@ boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPasswo
       boolean stateled;
       // using user-provided  _ssid, _pass in place of system-stored ssid and pass
       if (connectWifi(_ssid, _pass) != WL_CONNECTED) {
-        DEBUG_WM(F("Failed to connect."));
-        for(char i=0; i<10; i++){    //TEST SHOWING WHEN IT CONNECTED 19/04/2017
+        DEBUG_WM(F("Not trying to connect"));
+        /*for(char i=0; i<10; i++){    //TEST SHOWING WHEN IT CONNECTED 19/04/2017
         digitalWrite(RED_LED,1);
          delay(300);
         digitalWrite(RED_LED,0);
          delay(300);
-        }
-
+        } */
         // server->on("/submit", std::bind(&WiFiManager::handleSubmit, this));
 
       } else {
@@ -240,7 +241,7 @@ boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPasswo
          delay(100);
         }
 
-        WiFi.mode(WIFI_STA);
+        //WiFi.mode(WIFI_STA);
         //notify that configuration has changed and any optional parameters should be saved
         if ( _savecallback != NULL) {
           //todo: check if any custom parameters actually exist, and check if they really changed maybe
@@ -259,6 +260,7 @@ boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPasswo
         break;
       }
     }
+     // 'connecting to new AP' starts on 217
     //  yield();
      delay(0);
   }
@@ -277,8 +279,9 @@ int WiFiManager::connectWifi(String ssid, String pass) {
   if (WiFi.status() == WL_CONNECTED) {
     DEBUG_WM("Already connected. Bailing out.");
     return WL_CONNECTED;
-  }
+  } 
   //check if we have ssid and pass and force those, if not, try with last saved values
+  //*
   if (ssid != "") {
     WiFi.begin(ssid.c_str(), pass.c_str());
   } else {
@@ -294,15 +297,18 @@ int WiFiManager::connectWifi(String ssid, String pass) {
       DEBUG_WM("No saved credentials");
     }
   }
+//*/
 
-  int connRes = waitForConnectResult();
+  //int connRes = waitForConnectResult();
+  int connRes = 303;
   DEBUG_WM ("Connection result: ");
+  connRes = 304;
   DEBUG_WM ( connRes );
   //not connected, WPS enabled, no pass - first attempt
   if (_tryWPS && connRes != WL_CONNECTED && pass == "") {
     startWPS();
     //should be connected at the end of WPS
-    connRes = waitForConnectResult();
+    //connRes = waitForConnectResult();
   }
   return connRes;
 }
@@ -405,12 +411,12 @@ void WiFiManager::setBreakAfterConfig(boolean shouldBreak) {
 /** Handle root or redirect to captive portal */
 void WiFiManager::handleRoot() {
   DEBUG_WM(F("Handle root"));
-  if (captivePortal()) { // If caprive portal redirect instead of displaying the page.
+  if (captivePortal()) { // If captive portal redirect instead of displaying the page.
     return;
   }
-
+  //DEBUG_WM(F("right before printing pages"));
   String page = FPSTR(HTTP_HEAD);
-  page.replace("{v}", "Options");
+  page.replace("{v}", "Options"); // this is what brings up the buttons?
   page += FPSTR(HTTP_SCRIPT);
   page += FPSTR(HTTP_STYLE);
   page += _customHeadElement;
@@ -429,30 +435,31 @@ void WiFiManager::handleRoot() {
   page += F("</dd>");
   page += F("</br>");
 
-  page += F("<h3>System Config Portal</h3>");
+  page += F("<h3>PlayJack Portal</h3>");
   page += FPSTR(HTTP_PORTAL_OPTIONS);
   page += FPSTR(HTTP_END);
 
-  server->send(200, "text/html", page);
+  server->send(200, "text/html", page); 
 
 }
 
 /** Wifi config page handler */
-void WiFiManager::handleWifi(boolean scan) {
+void WiFiManager::handleWifi(boolean scan) { // boolean scan means yes or no on the scan
 
   String page = FPSTR(HTTP_HEAD);
-  page.replace("{v}", "Config ESP");
+  //page.replace("{v}", "Config ESP"); //this is where custom stuff goes in?
   page += FPSTR(HTTP_SCRIPT);
   page += FPSTR(HTTP_STYLE);
   page += _customHeadElement;
   page += FPSTR(HTTP_HEAD_END);
    page += FPSTR(HTTP_LOGO);
   // page += "<h1>";
-  // page += "Walkgreen v2.0";
+  // page += "PlayJack v2.0";
   // page += "</h1>";
   page += "<h5>";
   page += "Konel Inc.";
   page += "</h5>";
+/*  end line 534
   page += F("<h4>Available Wifi</h4>");
   if (scan) {
     int n = WiFi.scanNetworks();
@@ -523,12 +530,14 @@ void WiFiManager::handleWifi(boolean scan) {
       page += "<br/>";
     }
   }
+  
   page += F("<h4>SSID and Password</h4>");
-  page += FPSTR(HTTP_FORM_START);
+  page += FPSTR(HTTP_FORM_START);  // prevented saving when deleted?
+ */ // start line 460
   page += "<br/>";
   //---------------------------------------------------------------------
   char parLength[2];
-  page += F("<h4>LedSpeed /update interval (2~50)</h4>");
+  page += F("<h4>Color</h4>");
   String pitem = FPSTR(HTTP_FORM_PARAM);
   if (_params[0]->getID() != NULL) {
     pitem.replace("{i}", _params[0]->getID());
@@ -545,7 +554,7 @@ void WiFiManager::handleWifi(boolean scan) {
   page += pitem;
   page += "<br/>";
 //---------------------------------------------------------------------
-  page += F("<h4>P1 Color / fadeAmount (0~100) / P2 Color (0x??????)</h4>");
+  page += F("<h4>Pattern #/ Fade Time (0~100) / Run Speed</h4>");
 
   // char parLength[2];
   // add the extra parameters to the form
@@ -588,8 +597,8 @@ void WiFiManager::handleWifi(boolean scan) {
      page += "<br/>";
   }
 
-  page += FPSTR(HTTP_FORM_END);
-  page += FPSTR(HTTP_SCAN_LINK);
+  page += FPSTR(HTTP_FORM_END); // save button
+  //page += FPSTR(HTTP_SCAN_LINK); // dont need to scan for wifi connection
 
   page += FPSTR(HTTP_END);
 
@@ -845,3 +854,4 @@ String WiFiManager::toStringIp(IPAddress ip) {
   res += String(((ip >> 8 * 3)) & 0xFF);
   return res;
 }
+
