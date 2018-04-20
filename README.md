@@ -2,6 +2,8 @@
 
 Capabilities:
 - color and speed of LEDs can be changed from the wifi portal
+- doesn't require internet, just a wifi capable device.
+- change settings from one device to control settings in all devices
 - tested 135m two way communication using pcb trace antennas
 - 70m of communication was reached in Shibuya, Tokyo on a friday night.
 - 40m of reliable two way communication in Shibuya
@@ -17,10 +19,11 @@ This is a proof of concept using:
 
 To do
 - Captive portal adjustments (i want to add a color picker if possible?)
-- Make it possible to update without internet connection (just between phone and esp8266)
-- autocalibrate A0 sensor so it doesnt trigger when nothing is happening
+- autocalibrate A0 sensor so it doesnt trigger when nothing is happening // sort of done
+- Captive portal needs controls for ignoreMe / Echo / hsNo / ignoreThem
+    - these options can be set to true to test the features but not from the captive portal
 - separate timers for led fade and led runs
-- add LED count to adjustable settings
+- add LED count to adjustable settings // or set to 600?
 
 
 
