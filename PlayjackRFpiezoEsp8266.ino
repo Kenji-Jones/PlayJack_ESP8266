@@ -95,10 +95,9 @@ struct devInst{  /// data typedevice instructions (all variables)
   bool echo = false; // false prints 0, true prints 0
   bool ignoreMe = false; // if true, then controller will only act as trigger for the settings in the receiver
         // used to set ignoreReceived to true
-}storedInst, receivedInst; // Stored instructions, Received Instructions (write received instructions into here)
+}storedInst, receivedInst, followingInst; // Stored instructions, Received Instructions (write received instructions into here)
 
-bool ignoreThem = false; // if this is set to true, this device will react usings its own stored data but not
-
+bool ignoreThem = false; // if this is set to true, this device will react to the controller but will use its own stored settings
 
 
 
@@ -328,9 +327,10 @@ void setup() {   /****** SETUP: RUNS ONCE ******/
   //fadeAmount = strtol(port_read, NULL, 16);
   fadeAmount = atoi(port_read);
   ledSpeed = atoi(token_read);
+  //stored.hsNo = atoi(handshake_read);
 
 
-  storedInst.hsNo = 777;
+  storedInst.hsNo = 777; //atoi(handshake_read);
   storedInst.ledPattern = ledPattern; // 0 is all fade, 1 is run, 2 glitter, 3 rainbow?
   color_code = sleep_read; // does this work?
   storedInst.colorCode = deviceColor; // unsigned long
@@ -488,27 +488,34 @@ void loop() {     /****** LOOP: RUNS CONSTANTLY ******/
     //Serial.print("   Time received = ");
     //Serial.println(lastReceivedMillis);
 
-
-//////////// HANDSHAKE STARTS BELOW /////////////////
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+////////////                                    /////////////////
+////////////       HANDSHAKE STARTS BELOW       /////////////////
+////////////                                    /////////////////
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
     
     if (receivedInst.hsNo == storedInst.hsNo){ // if handshake numbers match then react
-
+        Serial.println("SUPER SOLID HANDSHAKE RECEIVED!!!");
        if (ignoreThem == true || receivedInst.ignoreMe == true){
         // change all receivedInst. to storedInst. to use device specific settings
+        followingInst = storedInst; //assigning device stored settings to be followed
         Serial.println("Controller Settings being ignored");
        }
        else {
         // make sure received instructions are followed
+        followingInst = receivedInst; // assigning received settings to be followed
        }
 
-      if (receivedInst.ledPattern == 0){ // pattern 0 = FADE
-        leds = receivedInst.colorCode;
-        fadeAmount = receivedInst.fadeTime;
+      if (followingInst.ledPattern == 0){ // pattern 0 = FADE
+        leds = followingInst.colorCode;
+        fadeAmount = followingInst.fadeTime;
       }
-      if (receivedInst.ledPattern == 1){ // pattern 1 = Run
-        deviceColor = receivedInst.colorCode; // is this okay?
-        fadeAmount = receivedInst.fadeTime;
-        ledSpeed =  receivedInst.runSpeed;
+      if (followingInst.ledPattern == 1){ // pattern 1 = Run
+        deviceColor = followingInst.colorCode; // is this okay?
+        fadeAmount = followingInst.fadeTime;
+        ledSpeed =  followingInst.runSpeed;
         dot1 = 0; //off
       Serial.println(" Run Started");  
       Serial.println(" Dot1 Hit");
@@ -521,11 +528,11 @@ void loop() {     /****** LOOP: RUNS CONSTANTLY ******/
    }*/
 
    else {
-    Serial.println(" HAND SHAKE WAS TOO AWKWARD. BAILING OUT. ");
+    Serial.println(" HAND SHAKE TOO AWKWARD. BAILING OUT. ");
     Serial.print(F("They tried shaking with  "));
     Serial.println(receivedInst.hsNo);
-    Serial.print(F("And I had given them "));
-    Serial.println(receivedInst.hsNo);
+    Serial.print(F("And the handshake I was going for looked like "));
+    Serial.println(storedInst.hsNo);
     //dataReceived = 0;
    }
     
@@ -570,7 +577,7 @@ void loop() {     /****** LOOP: RUNS CONSTANTLY ******/
             // leds[dot1] = CRGB::Black; // black means off
             //delay(15);
             //leds[dot1].setRGB( atoi(token_read), atoi(host_read), atoi(port_read)); //RGB method
-            leds[dot1] = receivedInst.colorCode; // converted from char hex using strtol
+            leds[dot1] = followingInst.colorCode; // converted from char hex using strtol
             //leds[dot1] = strtol(receivedInst.color_code, NULL, 16);
             dot1 = dot1+1;
             Serial.print(F("dot1 = "));
@@ -587,7 +594,7 @@ if (dot1 == NUM_LEDS) //
      Serial.println(dot1);
      ///*
      //// experiment
-     if (receivedInst.echo){
+     if (followingInst.echo){
      myRadio.stopListening();
      Serial.println(F("radio stop listening"));
      if (!myRadio.write(&storedInst,sizeof(storedInst))){
